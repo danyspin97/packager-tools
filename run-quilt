@@ -1,0 +1,54 @@
+#!/bin/bash
+
+auto=false
+if [[ "$1" == "--auto" || "$1" == "-a" ]]; then
+    auto=true
+fi
+
+pkg=$(basename $(pwd) | cut -f1 -d.)
+
+required_macros=$(osutil required-macros)
+if [[ ! -z "$required_macros" ]]; then
+    if ! rpm -q "${required_macros[@]}" > /dev/null; then
+        sudo zypper in --no-recommends --name --no-confirm --type package "${required_macros[@]}"
+        if [[ $? != 0 ]]; then
+            echo "zypper failed"
+            exit 1
+        fi
+    fi
+fi
+
+tmp="${TMPDIR:-/tmp/}run-quilt-tmp"
+# copy original spec file
+cp $pkg.spec $pkg.spec.orig
+MAX_RETRY=10
+i=0
+while [[ $i -lt $MAX_RETRY ]]; do
+    quilt -v setup $pkg.spec > $tmp
+    # get the first line containing the error
+    error=$(grep "^error: line" $tmp | head -n1)
+    if [[ -z $error ]]; then
+        break
+    fi
+    line=$(echo "$error" | sed -r 's/^error: line ([[:digit:]]+): .*/\1/')
+    if [[ -z $line ]]; then
+        echo "error"
+        exit 1
+    fi
+    if ! $auto ; then
+        echo $error
+        echo "Delete line $line? [y/n]"
+        IFS= read -N1 accept
+        echo ""
+        if [[ "$accept" != "y" || "$accept" != "Y" ]]; then
+            break
+        fi
+    fi
+    sed -e "${line}d" -i $pkg.spec
+    ((i++))
+done
+mv $pkg.spec.orig $pkg.spec
+if [[ $i == 10 ]]; then
+    echo "Could not run quilt automatically."
+    exit 1
+fi

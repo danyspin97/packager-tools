@@ -1,0 +1,14 @@
+#!/bin/sh
+
+set -e
+
+if [ -z "$1" ]; then
+    echo "Usage: $0 <rpm file>"
+    exit 1
+fi
+
+rpmfile=$(realpath $1)
+directory=$(mktemp -d)
+cd $directory
+rpm2cpio $rpmfile | cpio -idm
+echo "Unpacked to $directory"

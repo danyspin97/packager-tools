@@ -1,0 +1,35 @@
+#!/bin/bash
+# Name: run-spec-cleaner
+# Maintainer: danilo.spinella@suse.com
+# Requires: git-delta, spec-cleaner
+# Description: Run spec-cleaner and review changes before applying them
+# Usage: run-spec-cleaner
+
+usage() {
+    echo "run-spec-cleaner"
+}
+
+if [[ $# -ne 0 ]]; then
+    usage
+    exit 1
+fi
+
+pkg=$(basename $(pwd) | cut -f1 -d.)
+specfile=$pkg.spec
+tmpfile=/tmp/$specfile.new
+spec-cleaner $specfile > $tmpfile
+delta $specfile $tmpfile
+if [[ $? == 0 ]]; then
+    echo "No changes to be made!"
+    exit 0
+fi
+
+echo "Accept changes [y/n]"
+IFS= read -N1 accept
+echo ""
+if [[ "$accept" == "y" || "$accept" == "Y" ]]; then
+    mv $tmpfile $specfile
+    echo "Specfile updated!"
+else
+    echo "Changes rejected!"
+fi
